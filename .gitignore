@@ -1,12 +1,17 @@
-# Ignore virtual environment
+# Virtual environment
 .venv/
 
-# Ignore test files and docs
-TestApp
-TestApp.txt
-🏋️ Weightlifting Tracker – Test Checklist.docx
-~$*.docx
-
-# Ignore Python cache
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Office temp files
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
