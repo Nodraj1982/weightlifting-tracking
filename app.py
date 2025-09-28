@@ -23,6 +23,7 @@ conn = psycopg2.connect(
     user=os.environ.get("DB_USER"),
     password=os.environ.get("DB_PASSWORD"),
     port=os.environ.get("DB_PORT", 5432),
+    sslmode="require" 
 )
 cur = conn.cursor()
 
