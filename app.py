@@ -44,7 +44,7 @@ if st.session_state.user is None:
             user_data = login_user(email, password)
             st.session_state.user = user_data
             st.success("Logged in!")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(str(e))
 else:
@@ -52,7 +52,7 @@ else:
     st.success(f"Welcome {st.session_state.user.get('user', {}).get('email', 'User')}")
     if st.button("Log out"):
         st.session_state.user = None
-        st.experimental_rerun()
+        st.rerun()
 
     # -------------------------------
     # Database connection
