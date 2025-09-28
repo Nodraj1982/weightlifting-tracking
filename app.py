@@ -2,164 +2,110 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 import requests
+import os
 
-# -------------------------------
-# Supabase REST Auth setup
-# -------------------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+# --- Supabase REST login ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 def login_user(email, password):
     url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "email": email,
-        "password": password
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(response.json().get("error_description", "Login failed"))
+    headers = {"apikey": SUPABASE_KEY, "Content-Type": "application/json"}
+    payload = {"email": email, "password": password}
+    res = requests.post(url, headers=headers, json=payload)
+    res.raise_for_status()
+    return res.json()  # contains access_token + user object
 
-# -------------------------------
-# Session state for login
-# -------------------------------
+# --- Database connection ---
+conn = psycopg2.connect(
+    host=os.environ.get("DB_HOST"),
+    dbname=os.environ.get("DB_NAME"),
+    user=os.environ.get("DB_USER"),
+    password=os.environ.get("DB_PASSWORD"),
+    port=os.environ.get("DB_PORT", 5432),
+)
+cur = conn.cursor()
+
+# --- Workout functions ---
+def log_workout(exercise_name, weight, reps, user_id):
+    try:
+        cur.execute("SELECT id FROM exercises WHERE name = %s", (exercise_name,))
+        exercise_id = cur.fetchone()
+        if exercise_id:
+            cur.execute(
+                "INSERT INTO workouts (exercise_id, weight, reps, user_id) VALUES (%s, %s, %s, %s)",
+                (exercise_id[0], weight, reps, user_id),
+            )
+            conn.commit()
+            st.success("Workout logged!")
+        else:
+            st.error("Exercise not found.")
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error: {e}")
+
+def get_workouts(user_id):
+    cur.execute("""
+        SELECT w.workout_date, e.name, w.weight, w.reps
+        FROM workouts w
+        JOIN exercises e ON w.exercise_id = e.id
+        WHERE w.user_id = %s
+        ORDER BY w.workout_date DESC;
+    """, (user_id,))
+    rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=["Date", "Exercise", "Weight", "Reps"])
+
+# --- Streamlit UI ---
+st.title("🏋️ Weightlifting Tracker")
+
 if "user" not in st.session_state:
     st.session_state.user = None
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
 
-# -------------------------------
-# Login / Logout UI
-# -------------------------------
 if st.session_state.user is None:
-    # Show login form
     st.header("Login")
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
     if st.button("Log in"):
         try:
             user_data = login_user(email, password)
-            st.session_state.user = user_data
+            st.session_state.user = user_data["user"]
+            st.session_state.user_id = user_data["user"]["id"]
+            st.session_state.access_token = user_data["access_token"]
             st.success("Logged in!")
             st.rerun()
         except Exception as e:
             st.error(str(e))
 else:
-    # Show app content
-    st.success(f"Welcome {st.session_state.user.get('user', {}).get('email', 'User')}")
+    st.success(f"Welcome {st.session_state.user['email']}")
     if st.button("Log out"):
         st.session_state.user = None
+        st.session_state.user_id = None
+        st.session_state.access_token = None
         st.rerun()
 
-    # … rest of your tracker UI here …
+    st.subheader("Log Workout")
 
-    # -------------------------------
-    # Database connection
-    # -------------------------------
-    @st.cache_resource
-    def get_connection():
-        try:
-            return psycopg2.connect(st.secrets["DB_URI"])
-        except Exception as e:
-            st.error(f"Database connection failed: {e}")
-            return None
+    # Dropdown for exercises instead of free text
+    cur.execute("SELECT name FROM exercises ORDER BY name;")
+    exercise_names = [row[0] for row in cur.fetchall()]
+    exercise = st.selectbox("Exercise", exercise_names)
 
-    conn = get_connection()
-    cur = conn.cursor()
+    weight = st.number_input("Weight (kg)", min_value=0)
+    reps = st.number_input("Reps", min_value=0)
 
-    # -------------------------------
-    # Helper functions
-    # -------------------------------
-    def create_tables():
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS exercises (
-                id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS workouts (
-                id SERIAL PRIMARY KEY,
-                exercise_id INT REFERENCES exercises(id),
-                weight NUMERIC,
-                reps INT,
-                workout_date DATE DEFAULT CURRENT_DATE
-            );
-        """)
-        conn.commit()
-
-    def add_exercise(name):
-        try:
-            cur.execute("INSERT INTO exercises (name) VALUES (%s)", (name,))
-            conn.commit()
-            st.success(f"Exercise '{name}' added.")
-        except Exception as e:
-            conn.rollback()
-            st.error(f"Error: {e}")
-
-    def log_workout(exercise_name, weight, reps):
-        try:
-            cur.execute("SELECT id FROM exercises WHERE name = %s", (exercise_name,))
-            exercise_id = cur.fetchone()
-            if exercise_id:
-                cur.execute(
-                    "INSERT INTO workouts (exercise_id, weight, reps) VALUES (%s, %s, %s)",
-                    (exercise_id[0], weight, reps),
-                )
-                conn.commit()
-                st.success("Workout logged!")
-            else:
-                st.error("Exercise not found.")
-        except Exception as e:
-            conn.rollback()
-            st.error(f"Error: {e}")
-
-    def get_workouts():
-        cur.execute("""
-            SELECT w.workout_date, e.name, w.weight, w.reps
-            FROM workouts w
-            JOIN exercises e ON w.exercise_id = e.id
-            ORDER BY w.workout_date DESC;
-        """)
-        rows = cur.fetchall()
-        return pd.DataFrame(rows, columns=["Date", "Exercise", "Weight", "Reps"])
-
-    # -------------------------------
-    # Streamlit UI
-    # -------------------------------
-    create_tables()
-
-    menu = ["Add Exercise", "Log Workout", "View History"]
-    choice = st.sidebar.selectbox("Menu", menu)
-
-    if choice == "Add Exercise":
-        st.subheader("Add a New Exercise")
-        exercise_name = st.text_input("Exercise name")
-        if st.button("Add"):
-            if exercise_name.strip():
-                add_exercise(exercise_name.strip())
-            else:
-                st.warning("Please enter a valid exercise name.")
-
-    elif choice == "Log Workout":
-        st.subheader("Log a Workout")
-        cur.execute("SELECT name FROM exercises ORDER BY name;")
-        exercises = [row[0] for row in cur.fetchall()]
-        if exercises:
-            exercise = st.selectbox("Exercise", exercises)
-            weight = st.number_input("Weight (kg)", min_value=0.0, step=2.5)
-            reps = st.number_input("Reps", min_value=1, step=1)
-            if st.button("Log Workout"):
-                log_workout(exercise, weight, reps)
+    if st.button("Save Workout"):
+        if st.session_state.user_id:
+            log_workout(exercise, weight, reps, st.session_state.user_id)
         else:
-            st.info("No exercises found. Add one first.")
+            st.error("No user ID found in session.")
 
-    elif choice == "View History":
-        st.subheader("Workout History")
-        df = get_workouts()
+    st.subheader("Workout History")
+    if st.session_state.user_id:
+        df = get_workouts(st.session_state.user_id)
         if not df.empty:
             st.dataframe(df)
         else:
