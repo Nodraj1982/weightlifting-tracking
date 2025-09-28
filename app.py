@@ -1,20 +1,38 @@
 import streamlit as st
 import psycopg2
 import pandas as pd
-from supabase import create_client
+import requests
 
 # -------------------------------
-# Supabase Auth setup
+# Supabase REST Auth setup
 # -------------------------------
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
-supabase = create_client(url, key)
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
+def login_user(email, password):
+    url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "email": email,
+        "password": password
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(response.json().get("error_description", "Login failed"))
+
+# -------------------------------
+# Session state for login
+# -------------------------------
 if "user" not in st.session_state:
     st.session_state.user = None
 
 # -------------------------------
-# Login screen
+# Login / Logout UI
 # -------------------------------
 if st.session_state.user is None:
     st.title("🏋️ Weightlifting Tracker")
@@ -23,15 +41,15 @@ if st.session_state.user is None:
     password = st.text_input("Password", type="password")
     if st.button("Log in"):
         try:
-            user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-            st.session_state.user = user
+            user_data = login_user(email, password)
+            st.session_state.user = user_data
             st.success("Logged in!")
             st.experimental_rerun()
         except Exception as e:
-            st.error(f"Login failed: {e}")
+            st.error(str(e))
 else:
     st.title("🏋️ Weightlifting Tracker")
-    st.success(f"Welcome {st.session_state.user.user.email}")
+    st.success(f"Welcome {st.session_state.user.get('user', {}).get('email', 'User')}")
     if st.button("Log out"):
         st.session_state.user = None
         st.experimental_rerun()
