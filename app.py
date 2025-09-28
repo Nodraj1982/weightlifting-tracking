@@ -35,7 +35,7 @@ if "user" not in st.session_state:
 # Login / Logout UI
 # -------------------------------
 if st.session_state.user is None:
-    st.title("🏋️ Weightlifting Tracker")
+    # Show login form
     st.header("Login")
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
@@ -48,11 +48,13 @@ if st.session_state.user is None:
         except Exception as e:
             st.error(str(e))
 else:
-    st.title("🏋️ Weightlifting Tracker")
+    # Show app content
     st.success(f"Welcome {st.session_state.user.get('user', {}).get('email', 'User')}")
     if st.button("Log out"):
         st.session_state.user = None
         st.rerun()
+
+    # … rest of your tracker UI here …
 
     # -------------------------------
     # Database connection
