@@ -10,6 +10,20 @@ if not DATABASE_URL:
 
 conn = psycopg2.connect(DATABASE_URL)
 
+# --- Configurable increments per exercise ---
+# Default increment is 2.5 kg if exercise not listed
+INCREMENTS = {
+    "Bench Press": 2.5,
+    "Squat": 5.0,
+    "Deadlift": 5.0,
+    "Overhead Press": 2.5,
+    "Barbell Row": 2.5,
+}
+
+def get_increment(exercise_name: str) -> float:
+    """Return the increment for a given exercise, defaulting to 2.5 kg."""
+    return INCREMENTS.get(exercise_name, 2.5)
+
 # --- Exercise functions ---
 def get_exercises():
     with conn.cursor() as cur:
@@ -57,6 +71,8 @@ def get_workouts(user_id):
 
 def suggest_next_workout(user_id, exercise_name):
     """Suggest the next workout based on last logged set for this exercise."""
+    increment = get_increment(exercise_name)
+
     with conn.cursor() as cur:
         cur.execute("""
             SELECT w.weight, w.target_reps, w.success, w.scheme
@@ -76,19 +92,19 @@ def suggest_next_workout(user_id, exercise_name):
 
     if last_scheme == "3x15":
         if last_success:
-            return {"scheme": "3x15", "target_reps": 15, "weight": last_weight + 2.5}
+            return {"scheme": "3x15", "target_reps": 15, "weight": last_weight + increment}
         else:
             return {"scheme": "3x10", "target_reps": 10, "weight": last_weight}
 
     if last_scheme == "3x10":
         if last_success:
-            return {"scheme": "3x10", "target_reps": 10, "weight": last_weight + 2.5}
+            return {"scheme": "3x10", "target_reps": 10, "weight": last_weight + increment}
         else:
             return {"scheme": "3x5", "target_reps": 5, "weight": last_weight}
 
     if last_scheme == "3x5":
         if last_success:
-            return {"scheme": "3x5", "target_reps": 5, "weight": last_weight + 2.5}
+            return {"scheme": "3x5", "target_reps": 5, "weight": last_weight + increment}
         else:
             # Reset to 3x15, but drop slightly (second-best weight)
-            return {"scheme": "3x15", "target_reps": 15, "weight": max(0, last_weight - 2.5)}
+            return {"scheme": "3x15", "target_reps": 15, "weight": max(0, last_weight - increment)}
