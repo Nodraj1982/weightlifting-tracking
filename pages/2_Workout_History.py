@@ -15,6 +15,20 @@ if st.session_state.get("user_id"):
         st.subheader("Workout Log")
         st.dataframe(df, use_container_width=True)
 
+        # --- Per-exercise summary ---
+        st.subheader("Progression Summary")
+        summary = (
+            df.groupby(["Exercise", "Scheme"])
+            .agg(
+                Best_Weight=("Weight", "max"),
+                Last_Weight=("Weight", "last"),
+                Last_Success=("Success", "last"),
+            )
+            .reset_index()
+        )
+        st.dataframe(summary, use_container_width=True)
+
+        # --- Visual progression ---
         st.subheader("Progression Charts")
 
         # Dropdown to pick an exercise
