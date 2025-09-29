@@ -12,8 +12,26 @@ if st.session_state.get("user_id"):
         # Format Success as ✅ / ❌ for readability
         df["Success"] = df["Success"].apply(lambda x: "✅" if x else "❌")
 
+        # Compute training volume (sets × reps × weight)
+        df["Volume"] = df["Sets"] * df["Achieved Reps"] * df["Weight"]
+
         st.subheader("Workout Log")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(
+            df[
+                [
+                    "Date",
+                    "Exercise",
+                    "Weight",
+                    "Sets",
+                    "Target Reps",
+                    "Achieved Reps",
+                    "Success",
+                    "Scheme",
+                    "Volume",
+                ]
+            ],
+            use_container_width=True,
+        )
 
         # --- Per-exercise summary ---
         st.subheader("Progression Summary")
@@ -23,6 +41,7 @@ if st.session_state.get("user_id"):
                 Best_Weight=("Weight", "max"),
                 Last_Weight=("Weight", "last"),
                 Last_Success=("Success", "last"),
+                Avg_Volume=("Volume", "mean"),
             )
             .reset_index()
         )
@@ -45,7 +64,15 @@ if st.session_state.get("user_id"):
                 x="Date:T",
                 y="Weight:Q",
                 color="Scheme:N",
-                tooltip=["Date", "Weight", "Target Reps", "Achieved Reps", "Success", "Scheme"],
+                tooltip=[
+                    "Date",
+                    "Weight",
+                    "Sets",
+                    "Target Reps",
+                    "Achieved Reps",
+                    "Success",
+                    "Scheme",
+                ],
             )
             .properties(title=f"Weight Progression for {selected_ex}")
         )
@@ -59,7 +86,7 @@ if st.session_state.get("user_id"):
                 x="Date:T",
                 y="Achieved Reps:Q",
                 color="Scheme:N",
-                tooltip=["Date", "Target Reps", "Achieved Reps", "Success"],
+                tooltip=["Date", "Sets", "Target Reps", "Achieved Reps", "Success"],
             )
             .properties(title=f"Reps Achieved vs Target for {selected_ex}")
         )
@@ -69,6 +96,26 @@ if st.session_state.get("user_id"):
             .encode(x="Date:T", y="Target Reps:Q")
         )
         st.altair_chart(reps_chart + target_line, use_container_width=True)
+
+        # Line chart of training volume
+        volume_chart = (
+            alt.Chart(ex_df)
+            .mark_line(point=True, color="green")
+            .encode(
+                x="Date:T",
+                y="Volume:Q",
+                tooltip=[
+                    "Date",
+                    "Weight",
+                    "Sets",
+                    "Achieved Reps",
+                    "Volume",
+                    "Scheme",
+                ],
+            )
+            .properties(title=f"Training Volume for {selected_ex}")
+        )
+        st.altair_chart(volume_chart, use_container_width=True)
 
     else:
         st.info("No workouts logged yet.")
