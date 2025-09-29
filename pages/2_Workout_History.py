@@ -6,15 +6,18 @@ from db import get_workouts
 st.header("Workout History")
 ensure_session_keys()
 
-if st.session_state.get("user_id"):
-    df = get_workouts(st.session_state.user_id)
+user_id = st.session_state.get("user_id")
+
+if user_id:
+    df = get_workouts(user_id)
     if not df.empty:
-        # Format Success as ✅ / ❌ for readability
+        # Format success as ✅/❌
         df["Success"] = df["Success"].apply(lambda x: "✅" if x else "❌")
 
-        # Compute training volume (sets × reps × weight)
+        # Compute training volume
         df["Volume"] = df["Sets"] * df["Achieved Reps"] * df["Weight"]
 
+        # --- Workout log table ---
         st.subheader("Workout Log")
         st.dataframe(
             df[
@@ -33,7 +36,7 @@ if st.session_state.get("user_id"):
             use_container_width=True,
         )
 
-        # --- Per-exercise summary ---
+        # --- Summary table ---
         st.subheader("Progression Summary")
         summary = (
             df.groupby(["Exercise", "Scheme"])
@@ -47,16 +50,13 @@ if st.session_state.get("user_id"):
         )
         st.dataframe(summary, use_container_width=True)
 
-        # --- Visual progression ---
+        # --- Charts ---
         st.subheader("Progression Charts")
-
-        # Dropdown to pick an exercise
         exercise_list = df["Exercise"].unique().tolist()
         selected_ex = st.selectbox("Select Exercise", exercise_list)
-
         ex_df = df[df["Exercise"] == selected_ex]
 
-        # Line chart of weight over time
+        # Weight progression
         weight_chart = (
             alt.Chart(ex_df)
             .mark_line(point=True)
@@ -64,21 +64,13 @@ if st.session_state.get("user_id"):
                 x="Date:T",
                 y="Weight:Q",
                 color="Scheme:N",
-                tooltip=[
-                    "Date",
-                    "Weight",
-                    "Sets",
-                    "Target Reps",
-                    "Achieved Reps",
-                    "Success",
-                    "Scheme",
-                ],
+                tooltip=["Date", "Weight", "Sets", "Target Reps", "Achieved Reps", "Success", "Scheme"],
             )
             .properties(title=f"Weight Progression for {selected_ex}")
         )
         st.altair_chart(weight_chart, use_container_width=True)
 
-        # Bar chart of achieved vs target reps
+        # Reps achieved vs target
         reps_chart = (
             alt.Chart(ex_df)
             .mark_bar()
@@ -90,28 +82,17 @@ if st.session_state.get("user_id"):
             )
             .properties(title=f"Reps Achieved vs Target for {selected_ex}")
         )
-        target_line = (
-            alt.Chart(ex_df)
-            .mark_line(color="red", strokeDash=[4, 4])
-            .encode(x="Date:T", y="Target Reps:Q")
-        )
+        target_line = alt.Chart(ex_df).mark_line(color="red", strokeDash=[4, 4]).encode(x="Date:T", y="Target Reps:Q")
         st.altair_chart(reps_chart + target_line, use_container_width=True)
 
-        # Line chart of training volume
+        # Training volume
         volume_chart = (
             alt.Chart(ex_df)
             .mark_line(point=True, color="green")
             .encode(
                 x="Date:T",
                 y="Volume:Q",
-                tooltip=[
-                    "Date",
-                    "Weight",
-                    "Sets",
-                    "Achieved Reps",
-                    "Volume",
-                    "Scheme",
-                ],
+                tooltip=["Date", "Weight", "Sets", "Achieved Reps", "Volume", "Scheme"],
             )
             .properties(title=f"Training Volume for {selected_ex}")
         )

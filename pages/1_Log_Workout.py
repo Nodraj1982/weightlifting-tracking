@@ -11,7 +11,6 @@ from db import (
 st.header("Log Workout")
 ensure_session_keys()
 
-# Helper: compatible rerun for older/newer Streamlit versions
 def safe_rerun():
     if hasattr(st, "rerun"):
         st.rerun()
@@ -21,29 +20,28 @@ def safe_rerun():
 user_id = st.session_state.get("user_id")
 
 if user_id:
-    exercise_names = get_exercises()
+    exercise_names = get_exercises(user_id)
     if exercise_names:
         exercise = st.selectbox("Exercise", exercise_names)
 
         if exercise:
-            # Get starting scheme choice (if any)
+            # Check if user has a starting scheme
             starting_scheme = get_starting_scheme(user_id, exercise)
 
-            # If not set, let the user choose their start (5/10/15)
             if not starting_scheme:
-                choice = st.selectbox("Choose your starting rep range", ["5", "10", "15"], key="starting_range_choice")
+                choice = st.selectbox(
+                    "Choose your starting rep range", ["5", "10", "15"], key="starting_range_choice"
+                )
                 if st.button("Set Starting Scheme"):
                     set_starting_scheme(user_id, exercise, f"3x{choice}")
                     st.success(f"Starting scheme set to 3x{choice}")
                     safe_rerun()
-                # Block inputs until a starting scheme is chosen
                 st.info("Set a starting scheme to begin logging.")
                 st.stop()
 
-            # Show the chosen starting scheme
             st.info(f"Starting scheme for {exercise}: {starting_scheme}")
 
-            # Fetch suggestion safely
+            # Fetch suggestion
             suggestion = None
             try:
                 suggestion = suggest_next_workout(user_id, exercise)
@@ -60,7 +58,7 @@ if user_id:
                 st.warning("No suggestion available for this exercise yet.")
                 st.session_state.suggested = {}
 
-            # Pre-fill inputs with suggestion if available
+            # Inputs (prefilled from suggestion)
             suggested = st.session_state.get("suggested", {})
             weight = st.number_input(
                 "Weight (kg)", min_value=0, step=1, value=int(suggested.get("weight", 0))
@@ -74,7 +72,7 @@ if user_id:
             achieved_reps = st.number_input("Achieved Reps", min_value=0, step=1, value=0)
             success = st.checkbox("Success (hit target reps?)", value=False)
 
-            # Scheme defaults to suggested; if absent, derive from sets×reps
+            # Scheme defaults to suggested or sets×reps
             scheme = suggested.get("scheme") or f"{sets}x{target_reps}"
 
             if st.button("Save Workout"):
@@ -89,6 +87,6 @@ if user_id:
                     scheme,
                 )
     else:
-        st.info("No exercises found. Seed the exercises table first.")
+        st.info("No exercises found. Add your first exercise on the 'Add Exercise' page.")
 else:
     st.warning("Please log in on the Home page first.")
