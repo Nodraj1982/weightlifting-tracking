@@ -40,17 +40,20 @@ def log_workout(exercise_name, weight, target_reps, achieved_reps, success, user
         st.error(f"Error: {e}")
 
 def get_workouts(user_id):
-    """Fetch workouts for a given user (basic version)."""
+    """Fetch workouts for a given user, including progression fields."""
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT w.workout_date, e.name, w.weight, w.reps
+            SELECT w.workout_date, e.name, w.weight, w.target_reps, w.achieved_reps, w.success, w.scheme
             FROM workouts w
             JOIN exercises e ON w.exercise_id = e.id
             WHERE w.user_id = %s
             ORDER BY w.workout_date DESC;
         """, (user_id,))
         rows = cur.fetchall()
-    return pd.DataFrame(rows, columns=["Date", "Exercise", "Weight", "Reps"])
+    return pd.DataFrame(
+        rows,
+        columns=["Date", "Exercise", "Weight", "Target Reps", "Achieved Reps", "Success", "Scheme"]
+    )
 
 def suggest_next_workout(user_id, exercise_name):
     """Suggest the next workout based on last logged set for this exercise."""
