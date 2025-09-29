@@ -10,15 +10,16 @@ if st.session_state.get("user_id"):
     if exercise_names:
         exercise = st.selectbox("Exercise", exercise_names)
 
-        # Suggestion logic
-        if st.button("Suggest Next Workout"):
+        # Automatically fetch suggestion when exercise is chosen
+        if exercise:
             suggestion = suggest_next_workout(st.session_state.user_id, exercise)
             st.session_state.suggested = suggestion
-            st.success(
-                f"Suggested: {suggestion['scheme']} at {suggestion['weight']} kg"
+            st.info(
+                f"Suggested: {suggestion['scheme']} at {suggestion['weight']} kg "
+                f"({suggestion['target_reps']} reps)"
             )
 
-        # Pre-fill inputs if suggestion exists
+        # Pre-fill inputs with suggestion
         suggested = st.session_state.get("suggested", {})
         weight = st.number_input(
             "Weight (kg)", min_value=0, step=1, value=suggested.get("weight", 0)
