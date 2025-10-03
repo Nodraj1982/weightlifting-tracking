@@ -1,5 +1,5 @@
 import os
-import psycopg2
+import psycopg
 import pandas as pd
 import streamlit as st
 from datetime import date
@@ -10,7 +10,7 @@ if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is missing.")
 
 # Keep a single connection open
-conn = psycopg2.connect(DATABASE_URL)
+conn = psycopg.connect(DATABASE_URL)
 
 # --- Utility: always require a logged-in user ---
 def require_user_id() -> str:
