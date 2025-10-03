@@ -2,13 +2,14 @@ import os
 import psycopg2
 import pandas as pd
 import streamlit as st
+from datetime import date
 
 # --- Database connection ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is missing.")
 
-# Use autocommit = False so we can control commits/rollbacks
+# Keep a single connection open
 conn = psycopg2.connect(DATABASE_URL)
 
 # --- Utility: always require a logged-in user ---
@@ -99,8 +100,15 @@ def set_starting_scheme(exercise_name: str, scheme: str):
 
 # --- Workouts ---
 def log_workout(exercise_name: str, weight: float, sets: int,
-                target_reps: int, achieved_reps: int, success: bool, scheme: str):
+                target_reps: int, achieved_reps: int, success: bool,
+                scheme: str, workout_date: date = None):
+    """
+    Insert a workout row tied to the current session user.
+    If workout_date is not provided, defaults to today.
+    """
     user_id = require_user_id()
+    if workout_date is None:
+        workout_date = date.today()
     try:
         ex_id = _get_exercise_id_for_user(exercise_name)
         if not ex_id:
@@ -108,9 +116,9 @@ def log_workout(exercise_name: str, weight: float, sets: int,
             return
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO workouts (exercise_id, weight, sets, target_reps, achieved_reps, success, user_id, scheme)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (ex_id, weight, sets, target_reps, achieved_reps, success, user_id, scheme))
+                INSERT INTO workouts (exercise_id, weight, sets, target_reps, achieved_reps, success, user_id, scheme, workout_date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (ex_id, weight, sets, target_reps, achieved_reps, success, user_id, scheme, workout_date))
             conn.commit()
             st.success("Workout logged!")
     except Exception as e:
@@ -178,3 +186,29 @@ def suggest_next_workout(exercise_name: str):
             "target_reps": last_target or 10,
             "weight": last_weight or 20,
             "sets": 3}
+
+def get_previous_workout(exercise_name: str):
+    user_id = require_user_id()
+    ex_id = _get_exercise_id_for_user(exercise_name)
+    if not ex_id:
+        return None
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT workout_date, weight, sets, target_reps, achieved_reps, success, scheme
+            FROM workouts
+            WHERE user_id = %s AND exercise_id = %s
+            ORDER BY workout_date DESC
+            LIMIT 1;
+        """, (user_id, ex_id))
+        row = cur.fetchone()
+        if row:
+            return {
+                "date": row[0],
+                "weight": row[1],
+                "sets": row[2],
+                "target_reps": row[3],
+                "achieved_reps": row[4],
+                "success": row[5],
+                "scheme": row[6]
+            }
+        return None
