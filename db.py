@@ -3,11 +3,12 @@ import psycopg
 import pandas as pd
 from supabase import create_client
 
-# Read secrets
+# --- Secrets ---
 DATABASE_URL = st.secrets["DATABASE_URL"]
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
+# --- Cached connections ---
 @st.cache_resource
 def get_connection():
     return psycopg.connect(DATABASE_URL)
@@ -17,17 +18,21 @@ def get_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def current_user_id():
-    return st.session_state.get("user_id")
+    uid = st.session_state.get("user_id")
+    if not uid:
+        raise RuntimeError("No user_id in session.")
+    return uid
 
-# --- Exercises ---
+# ----------------- Exercises -----------------
 def add_exercise(exercise_name: str):
     uid = current_user_id()
     conn = get_connection()
     with conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO exercises (user_id, name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (uid, exercise_name),
-        )
+        cur.execute("""
+            INSERT INTO exercises (user_id, name)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, name) DO NOTHING
+        """, (uid, exercise_name))
         conn.commit()
 
 def get_exercises():
@@ -37,44 +42,55 @@ def get_exercises():
         cur.execute("SELECT name FROM exercises WHERE user_id = %s ORDER BY name", (uid,))
         return [r[0] for r in cur.fetchall()]
 
-# --- Workouts ---
+# ----------------- Workouts -----------------
 def log_workout(exercise_name, weight, sets, target_reps, achieved_reps, success, scheme, workout_date):
     uid = current_user_id()
     conn = get_connection()
     with conn.cursor() as cur:
-        cur.execute(
-            """INSERT INTO workouts
-               (user_id, exercise, date, weight, sets, target_reps, achieved_reps, success, scheme)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (uid, exercise_name, workout_date, weight, sets, target_reps, achieved_reps, success, scheme),
-        )
+        # Look up exercise_id
+        cur.execute("SELECT id FROM exercises WHERE user_id = %s AND name = %s", (uid, exercise_name))
+        row = cur.fetchone()
+        if not row:
+            raise RuntimeError(f"Exercise '{exercise_name}' not found for user {uid}")
+        exercise_id = row[0]
+
+        cur.execute("""
+            INSERT INTO workouts (user_id, exercise_id, workout_date, weight, sets, target_reps, achieved_reps, success, scheme)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (uid, exercise_id, workout_date, weight, sets, target_reps, achieved_reps, success, scheme))
         conn.commit()
 
 def get_workouts():
     uid = current_user_id()
     conn = get_connection()
-    return pd.read_sql_query(
-        """SELECT date AS "Date", exercise AS "Exercise", weight AS "Weight",
-                  sets AS "Sets", target_reps AS "Target Reps",
-                  achieved_reps AS "Achieved Reps", success AS "Success", scheme AS "Scheme"
-           FROM workouts
-           WHERE user_id = %s
-           ORDER BY date DESC""",
-        conn,
-        params=(uid,),
-    )
+    return pd.read_sql_query("""
+        SELECT w.workout_date AS "Date",
+               e.name AS "Exercise",
+               w.weight AS "Weight",
+               w.sets AS "Sets",
+               w.target_reps AS "Target Reps",
+               w.achieved_reps AS "Achieved Reps",
+               w.success AS "Success",
+               w.scheme AS "Scheme"
+        FROM workouts w
+        JOIN exercises e ON w.exercise_id = e.id
+        WHERE w.user_id = %s
+        ORDER BY w.workout_date DESC
+    """, conn, params=(uid,))
 
 def get_previous_workout(exercise_name: str):
     uid = current_user_id()
     conn = get_connection()
     with conn.cursor() as cur:
-        cur.execute(
-            """SELECT date, weight, sets, target_reps, achieved_reps, success, scheme
-               FROM workouts
-               WHERE user_id = %s AND exercise = %s
-               ORDER BY date DESC LIMIT 1""",
-            (uid, exercise_name),
-        )
+        cur.execute("""
+            SELECT w.workout_date, w.weight, w.sets, w.target_reps,
+                   w.achieved_reps, w.success, w.scheme
+            FROM workouts w
+            JOIN exercises e ON w.exercise_id = e.id
+            WHERE w.user_id = %s AND e.name = %s
+            ORDER BY w.workout_date DESC
+            LIMIT 1
+        """, (uid, exercise_name))
         row = cur.fetchone()
     if not row:
         return None
