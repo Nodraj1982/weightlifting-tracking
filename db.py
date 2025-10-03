@@ -3,11 +3,22 @@ import psycopg2
 import pandas as pd
 import streamlit as st
 
+# --- Database connection ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is missing.")
+
+# Use autocommit = False so we can control commits/rollbacks
 conn = psycopg2.connect(DATABASE_URL)
 
+# --- Utility: always require a logged-in user ---
+def require_user_id() -> str:
+    uid = st.session_state.get("user_id")
+    if not uid:
+        raise RuntimeError("No user_id in session — user must be signed in.")
+    return uid
+
+# --- Increments for progression ---
 INCREMENTS = {
     "Bench Press": 2.5,
     "Squat": 5.0,
@@ -19,7 +30,8 @@ def get_increment(exercise_name: str) -> float:
     return INCREMENTS.get(exercise_name, 2.5)
 
 # --- Exercise management ---
-def add_exercise(user_id, name):
+def add_exercise(name: str):
+    user_id = require_user_id()
     cleaned = name.strip()
     if not cleaned:
         st.error("Exercise name cannot be empty.")
@@ -42,20 +54,23 @@ def add_exercise(user_id, name):
         conn.rollback()
         st.error(f"Error adding exercise: {e}")
 
-def get_exercises(user_id):
+def get_exercises():
+    user_id = require_user_id()
     with conn.cursor() as cur:
         cur.execute("SELECT name FROM exercises WHERE user_id = %s ORDER BY name;", (user_id,))
         return [row[0] for row in cur.fetchall()]
 
-def _get_exercise_id_for_user(user_id, exercise_name):
+def _get_exercise_id_for_user(exercise_name: str):
+    user_id = require_user_id()
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM exercises WHERE user_id = %s AND name = %s", (user_id, exercise_name))
         row = cur.fetchone()
         return row[0] if row else None
 
 # --- Starting scheme ---
-def get_starting_scheme(user_id, exercise_name):
-    ex_id = _get_exercise_id_for_user(user_id, exercise_name)
+def get_starting_scheme(exercise_name: str):
+    user_id = require_user_id()
+    ex_id = _get_exercise_id_for_user(exercise_name)
     if not ex_id:
         return None
     with conn.cursor() as cur:
@@ -67,8 +82,9 @@ def get_starting_scheme(user_id, exercise_name):
         row = cur.fetchone()
         return row[0] if row else None
 
-def set_starting_scheme(user_id, exercise_name, scheme):
-    ex_id = _get_exercise_id_for_user(user_id, exercise_name)
+def set_starting_scheme(exercise_name: str, scheme: str):
+    user_id = require_user_id()
+    ex_id = _get_exercise_id_for_user(exercise_name)
     if not ex_id:
         st.error("Exercise not found for this user.")
         return
@@ -82,9 +98,11 @@ def set_starting_scheme(user_id, exercise_name, scheme):
         conn.commit()
 
 # --- Workouts ---
-def log_workout(exercise_name, weight, sets, target_reps, achieved_reps, success, user_id, scheme):
+def log_workout(exercise_name: str, weight: float, sets: int,
+                target_reps: int, achieved_reps: int, success: bool, scheme: str):
+    user_id = require_user_id()
     try:
-        ex_id = _get_exercise_id_for_user(user_id, exercise_name)
+        ex_id = _get_exercise_id_for_user(exercise_name)
         if not ex_id:
             st.error("Exercise not found for this user. Add it first.")
             return
@@ -99,7 +117,8 @@ def log_workout(exercise_name, weight, sets, target_reps, achieved_reps, success
         conn.rollback()
         st.error(f"Error logging workout: {e}")
 
-def get_workouts(user_id):
+def get_workouts():
+    user_id = require_user_id()
     with conn.cursor() as cur:
         cur.execute("""
             SELECT w.workout_date, e.name, w.weight, w.sets, w.target_reps, w.achieved_reps, w.success, w.scheme
@@ -114,9 +133,10 @@ def get_workouts(user_id):
         columns=["Date", "Exercise", "Weight", "Sets", "Target Reps", "Achieved Reps", "Success", "Scheme"]
     )
 
-def suggest_next_workout(user_id, exercise_name):
+def suggest_next_workout(exercise_name: str):
+    user_id = require_user_id()
     increment = get_increment(exercise_name)
-    starting_scheme = get_starting_scheme(user_id, exercise_name)
+    starting_scheme = get_starting_scheme(exercise_name)
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -154,4 +174,7 @@ def suggest_next_workout(user_id, exercise_name):
                 "weight": last_weight + increment if last_success else max(0, last_weight - increment),
                 "sets": 3}
 
-    return {"scheme": starting_scheme or "3x10", "target_reps": last_target or 10, "weight": last_weight or 20, "sets": 3}
+    return {"scheme": starting_scheme or "3x10",
+            "target_reps": last_target or 10,
+            "weight": last_weight or 20,
+            "sets": 3}

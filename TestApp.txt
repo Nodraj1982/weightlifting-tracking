@@ -1,0 +1,3 @@
+cd C:\Projects\WeightliftingTracker
+.venv\Scripts\activate
+streamlit run app.py
