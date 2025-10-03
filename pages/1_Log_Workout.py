@@ -102,4 +102,4 @@ with st.form("log_workout_form"):
             st.error(f"Error logging workout: {e}")
 
     if clear:
-        st.experimental_rerun()
+         st.rerun()
