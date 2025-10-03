@@ -70,7 +70,13 @@ with st.form("log_workout_form"):
         "Achieved reps", min_value=0, step=1, value=int(suggestion["target_reps"])
     )
     success = st.checkbox("Success?", value=True)
-    scheme = st.text_input("Scheme", value=suggestion["scheme"])
+
+    # ✅ Scheme selection (restricted options)
+    scheme_options = ["3 x 15", "3 x 10", "5 x 5"]
+    default_scheme = suggestion.get("scheme", "5 x 5")
+    if default_scheme not in scheme_options:
+        default_scheme = "5 x 5"
+    scheme = st.selectbox("Scheme", scheme_options, index=scheme_options.index(default_scheme))
 
     # --- Buttons ---
     col1, col2 = st.columns(2)
@@ -91,6 +97,7 @@ with st.form("log_workout_form"):
                 scheme=scheme,
                 workout_date=workout_date,
             )
+            st.success("Workout logged!")
         except Exception as e:
             st.error(f"Error logging workout: {e}")
 
