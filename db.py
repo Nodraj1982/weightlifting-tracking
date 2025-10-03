@@ -88,7 +88,7 @@ def get_previous_workout(exercise_name: str):
             FROM workouts w
             JOIN exercises e ON w.exercise_id = e.id
             WHERE w.user_id = %s AND e.name = %s
-            ORDER BY w.workout_date DESC, w.id DESC
+            ORDER BY w.created_at DESC
             LIMIT 1
         """, (uid, exercise_name))
         row = cur.fetchone()
@@ -106,6 +106,8 @@ def get_previous_workout(exercise_name: str):
 
 def suggest_next_workout(exercise_name: str):
     prev = get_previous_workout(exercise_name)
+
+
     scheme_cycle = ["3 x 15", "3 x 10", "5 x 5"]
 
     if not prev:
