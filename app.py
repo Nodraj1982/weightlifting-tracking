@@ -7,6 +7,22 @@ st.set_page_config(page_title="Weightlifting Tracker", page_icon="🏋️")
 
 st.title("🏋️ Weightlifting Tracker")
 
+st.title("🏋️ Weightlifting Tracker")
+
+# --- Update notes for testers ---
+st.success("""
+### 🙏 Thank You to Our Tester
+Your excellent suggestions and feedback have been invaluable.  
+We’ve listened carefully to your comments and made the following improvements:
+
+- 🔒 **No more unexpected logouts** – sessions now refresh automatically in the background.  
+- ⏱ **Extended login stability** – you can stay signed in for longer without interruption.  
+- 🚪 **Clean logout** – when you choose to log out, all session data is cleared securely.  
+
+We’re grateful for your input and excited for you to try the smoother experience.  
+For any further feedback, please reach out at: **Jordan.kennedy.leeds@googlemail.com**
+""")
+
 # --- Initialise Supabase client ---
 supabase: Client = create_client(
     st.secrets["SUPABASE_URL"],
