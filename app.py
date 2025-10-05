@@ -1,6 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-from utils import ensure_session_keys
+from utils import ensure_session_keys, refresh_supabase_session, login_user
 
 # --- Page config ---
 st.set_page_config(page_title="Weightlifting Tracker", page_icon="🏋️")
@@ -16,6 +16,17 @@ supabase: Client = create_client(
 # --- Ensure session keys exist ---
 ensure_session_keys()
 
+# --- Background auto-refresh every 30 minutes ---
+# Requires: pip install streamlit-autorefresh
+try:
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=1800000, key="session_refresh")  # 30 min = 1,800,000 ms
+except ImportError:
+    st.warning("streamlit-autorefresh not installed. Background refresh disabled.")
+
+# --- Refresh session if needed ---
+refresh_supabase_session()
+
 # --- Authentication logic ---
 if st.session_state.user is None:
     st.header("Login / Sign Up")
@@ -27,11 +38,8 @@ if st.session_state.user is None:
         password = st.text_input("Password", type="password", key="login_password")
         if st.button("Log in"):
             try:
-                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                if res.user:
-                    st.session_state.user = {"email": res.user.email, "id": res.user.id}
-                    st.session_state.user_id = res.user.id
-                    st.success(f"Logged in as {res.user.email}")
+                if login_user(email, password):
+                    st.success(f"Logged in as {st.session_state.user['email']}")
                     st.rerun()
                 else:
                     st.error("Invalid login credentials.")
@@ -54,7 +62,7 @@ if st.session_state.user is None:
 else:
     st.success(f"Welcome {st.session_state.user['email']}")
     if st.button("Log out"):
-        for key in ["user", "user_id", "access_token"]:
+        for key in ["user", "user_id", "access_token", "refresh_token"]:
             st.session_state[key] = None
         st.rerun()
 
