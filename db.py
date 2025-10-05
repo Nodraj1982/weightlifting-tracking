@@ -107,46 +107,18 @@ def get_previous_workout(exercise_name: str):
 def suggest_next_workout(exercise_name: str):
     prev = get_previous_workout(exercise_name)
 
-
-    scheme_cycle = ["3 x 15", "3 x 10", "5 x 5"]
+    # 🔄 Updated cycle
+    scheme_cycle = ["3 x 15", "3 x 10", "3 x 5"]
 
     if not prev:
         return {"weight": 20.0, "sets": 3, "target_reps": 15, "scheme": "3 x 15"}
 
-    # Normalize scheme
     scheme_aliases = {
         "3x15": "3 x 15", "3 x 15": "3 x 15", "3×15": "3 x 15",
         "3x10": "3 x 10", "3 x 10": "3 x 10", "3×10": "3 x 10",
-        "5x5": "5 x 5", "5 x 5": "5 x 5", "5×5": "5 x 5",
+        "3x5": "3 x 5", "3 x 5": "3 x 5", "3×5": "3 x 5",
     }
-    current_scheme = scheme_aliases.get(prev["scheme"], "3 x 15")
-    idx = scheme_cycle.index(current_scheme)
-
-    if prev["success"]:
-        # Stay in same scheme, add weight
-        inc = 2.5
-        next_scheme = current_scheme
-    else:
-        # Failure → move to next scheme in cycle
-        inc = 0.0
-        next_scheme = scheme_cycle[(idx + 1) % len(scheme_cycle)]
-
-    scheme_defaults = {
-        "3 x 15": (3, 15),
-        "3 x 10": (3, 10),
-        "5 x 5": (5, 5),
-    }
-    sets, reps = scheme_defaults[next_scheme]
-
-    return {
-        "weight": float(prev["weight"]) + inc,
-        "sets": sets,
-        "target_reps": reps,
-        "scheme": next_scheme,
-    }
-
-    # Normalize previous scheme
-    current_scheme = scheme_aliases.get(prev["scheme"], "3 x 15")
+    current_scheme = scheme_aliases.get(str(prev["scheme"]).strip(), "3 x 15")
     idx = scheme_cycle.index(current_scheme)
 
     if prev["success"]:
@@ -156,10 +128,11 @@ def suggest_next_workout(exercise_name: str):
         inc = 0.0
         next_scheme = scheme_cycle[(idx + 1) % len(scheme_cycle)]
 
+    # 🔄 Updated defaults
     scheme_defaults = {
         "3 x 15": (3, 15),
         "3 x 10": (3, 10),
-        "5 x 5": (5, 5),
+        "3 x 5": (3, 5),
     }
     sets, reps = scheme_defaults[next_scheme]
 
