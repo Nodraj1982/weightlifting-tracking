@@ -118,6 +118,7 @@ def suggest_next_workout(exercise_name: str):
         "3x10": "3 x 10", "3 x 10": "3 x 10", "3×10": "3 x 10",
         "3x5": "3 x 5", "3 x 5": "3 x 5", "3×5": "3 x 5",
     }
+    
     current_scheme = scheme_aliases.get(str(prev["scheme"]).strip(), "3 x 15")
     idx = scheme_cycle.index(current_scheme)
 

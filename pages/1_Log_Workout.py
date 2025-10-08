@@ -72,10 +72,10 @@ with st.form("log_workout_form"):
     success = st.checkbox("Success?", value=True)
 
     # ✅ Scheme selection (restricted options)
-    scheme_options = ["3 x 15", "3 x 10", "5 x 5"]
-    default_scheme = suggestion.get("scheme", "5 x 5")
+    scheme_options = ["3 x 15", "3 x 10", "3 x 5"]
+    default_scheme = suggestion.get("scheme", "3 x 5")
     if default_scheme not in scheme_options:
-        default_scheme = "5 x 5"
+        default_scheme = "3 x 5"
     scheme = st.selectbox("Scheme", scheme_options, index=scheme_options.index(default_scheme))
 
     # --- Buttons ---
