@@ -9,7 +9,7 @@ st.title("🏋️ Weightlifting Tracker")
 
 # --- Update notes for testers ---
 st.success("""
-Update to scheme control. No Has 3 x 15, 3 x 10, 3 x 5 only. Suggestion logic updated accordingly.
+Update to scheme control. Now Has 3 x 15, 3 x 10, 3 x 5 only. Suggestion logic updated accordingly.
 For any further feedback, please reach out at: **Jordan.kennedy.leeds@googlemail.com**
 """)
 
