@@ -72,16 +72,6 @@ else:
             st.session_state[key] = None
         st.rerun()
 
-# --- Sidebar navigation ---
-st.sidebar.title("Navigation")
-st.sidebar.markdown(
-    """
-    - ➕ **Add Exercise**  
-    - 💪 **Log Workout**  
-    - 📜 **Workout History**  
-    """
-)
-st.sidebar.caption("Pages are also listed automatically below.")
 
 # --- Debug info (optional) ---
 st.write("Current user_id in session:", st.session_state.get("user_id"))
