@@ -9,16 +9,7 @@ st.title("🏋️ Weightlifting Tracker")
 
 # --- Update notes for testers ---
 st.success("""
-### 🙏 Thank You to Our Amazing Tester
-Your excellent suggestions and feedback have been invaluable.  
-We’ve listened carefully to your comments and made the following improvements:
-
-- 🔒 **No more unexpected logouts** – sessions now refresh automatically in the background.  
-- ⏱ **Extended login stability** – you can stay signed in for longer without interruption.  
-- 🚪 **Clean logout** – when you choose to log out, all session data is cleared securely.  
-
-We’re grateful for your input and excited for you to try the smoother experience. Anything at all i can do to 
-            thank you properly, please just ask.
+Update to scheme control. No Has 3 x 15, 3 x 10, 3 x 5 only. Suggestion logic updated accordingly.
 For any further feedback, please reach out at: **Jordan.kennedy.leeds@googlemail.com**
 """)
 
