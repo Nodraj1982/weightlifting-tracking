@@ -143,3 +143,65 @@ def suggest_next_workout(exercise_name: str):
         "target_reps": reps,
         "scheme": next_scheme,
     }
+# ----------------- Cardio Workouts -----------------
+def log_cardio(workout_type, time_minutes, distance_km, difficulty_level, workout_date):
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO cardio_workouts (user_id, workout_type, workout_date, time_minutes, distance_km, difficulty_level)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (uid, workout_type, workout_date, time_minutes, distance_km, difficulty_level))
+        conn.commit()
+
+def get_cardio_workouts():
+    uid = current_user_id()
+    conn = get_connection()
+    return pd.read_sql_query("""
+        SELECT workout_date AS "Date",
+               workout_type AS "Workout Type",
+               time_minutes AS "Time (min)",
+               distance_km AS "Distance (km)",
+               difficulty_level AS "Difficulty"
+        FROM cardio_workouts
+        WHERE user_id = %s
+        ORDER BY workout_date DESC
+    """, conn, params=(uid,))
+
+def get_last_cardio(workout_type: str):
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT workout_date, time_minutes, distance_km, difficulty_level
+            FROM cardio_workouts
+            WHERE user_id = %s AND workout_type = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (uid, workout_type))
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "date": row[0],
+        "time": row[1],
+        "distance": row[2],
+        "difficulty": row[3],
+    }
+def add_cardio_exercise(name: str):
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO cardio_exercises (user_id, name)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, name) DO NOTHING
+        """, (uid, name))
+        conn.commit()
+
+def get_cardio_exercises():
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM cardio_exercises WHERE user_id = %s ORDER BY name", (uid,))
+        return [r[0] for r in cur.fetchall()]
