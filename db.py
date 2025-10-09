@@ -107,7 +107,6 @@ def get_previous_workout(exercise_name: str):
 def suggest_next_workout(exercise_name: str):
     prev = get_previous_workout(exercise_name)
 
-    # 🔄 Updated cycle
     scheme_cycle = ["3 x 15", "3 x 10", "3 x 5"]
 
     if not prev:
@@ -129,7 +128,6 @@ def suggest_next_workout(exercise_name: str):
         inc = 0.0
         next_scheme = scheme_cycle[(idx + 1) % len(scheme_cycle)]
 
-    # 🔄 Updated defaults
     scheme_defaults = {
         "3 x 15": (3, 15),
         "3 x 10": (3, 10),
@@ -143,6 +141,7 @@ def suggest_next_workout(exercise_name: str):
         "target_reps": reps,
         "scheme": next_scheme,
     }
+
 # ----------------- Cardio Workouts -----------------
 def log_cardio(workout_type, time_minutes, distance_km, difficulty_level, workout_date):
     uid = current_user_id()
@@ -188,6 +187,7 @@ def get_last_cardio(workout_type: str):
         "distance": row[2],
         "difficulty": row[3],
     }
+
 def add_cardio_exercise(name: str):
     uid = current_user_id()
     conn = get_connection()
@@ -205,3 +205,213 @@ def get_cardio_exercises():
     with conn.cursor() as cur:
         cur.execute("SELECT name FROM cardio_exercises WHERE user_id = %s ORDER BY name", (uid,))
         return [r[0] for r in cur.fetchall()]
+
+# ----------------- Optional: family display names -----------------
+def get_family_display_name(email: str) -> str:
+    """
+    Map emails to friendly display names (e.g., 'Mum', 'Jordan').
+    Replace or extend this as needed, or wire to a table later.
+    """
+    aliases = {
+        # "someone@example.com": "Mum",
+        # "jordan.kennedy.leeds@googlemail.com": "Jordan",
+    }
+    return aliases.get(email, email)
+
+# ----------------- Pips & NYT Games -----------------
+
+def log_pips_score(difficulty: str, time_seconds: int, puzzle_date):
+    """
+    Log or update the current user's Pips score for a given difficulty and date.
+    Stores raw seconds in the database.
+    """
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO pips_scores (user_id, puzzle_date, difficulty, time_seconds)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_id, puzzle_date, difficulty) DO UPDATE
+            SET time_seconds = EXCLUDED.time_seconds
+        """, (uid, puzzle_date, difficulty, time_seconds))
+        conn.commit()
+
+
+def log_nyt_score(game: str, score: int, puzzle_date, notes: str = None):
+    """
+    Log or update the current user's score for a generic NYT game
+    (Wordle, Connections, Spelling Bee).
+    """
+    uid = current_user_id()
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO nyt_scores (user_id, game, puzzle_date, score, notes)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, game, puzzle_date) DO UPDATE
+            SET score = EXCLUDED.score,
+                notes = EXCLUDED.notes
+        """, (uid, game, puzzle_date, score, notes))
+        conn.commit()
+
+
+# --- Helper to format seconds into MM:SS ---
+def format_time(seconds: int) -> str:
+    if seconds is None:
+        return ""
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}:{secs:02d}"
+
+
+def get_pips_daily_leaderboard(puzzle_date):
+    """
+    Return daily leaderboards for easy, medium, hard, and overall.
+    Each DataFrame has columns: Name, time (MM:SS), points.
+    """
+    conn = get_connection()
+    results = {}
+
+    # Per-difficulty leaderboards
+    for diff in ["easy", "medium", "hard"]:
+        query = """
+        WITH ranked AS (
+            SELECT s.user_id,
+                   COALESCE(f.display_name, u.email) AS name,
+                   s.time_seconds,
+                   RANK() OVER (ORDER BY s.time_seconds ASC) AS rnk
+            FROM pips_scores s
+            JOIN auth.users u ON s.user_id = u.id
+            LEFT JOIN family_members f ON u.id = f.user_id
+            WHERE s.puzzle_date = %s AND s.difficulty = %s
+        )
+        SELECT name,
+               time_seconds,
+               CASE rnk WHEN 1 THEN 3
+                        WHEN 2 THEN 2
+                        WHEN 3 THEN 1
+                        ELSE 0 END AS points
+        FROM ranked
+        ORDER BY rnk
+        """
+        df = pd.read_sql_query(query, conn, params=(puzzle_date, diff))
+        if not df.empty:
+            df["time"] = df["time_seconds"].apply(format_time)
+            df = df[["name", "time", "points"]]
+        results[diff] = df
+
+    # Overall leaderboard (sum across difficulties)
+    query = """
+    WITH totals AS (
+        SELECT s.user_id,
+               COALESCE(f.display_name, u.email) AS name,
+               SUM(s.time_seconds) AS total_time
+        FROM pips_scores s
+        JOIN auth.users u ON s.user_id = u.id
+        LEFT JOIN family_members f ON u.id = f.user_id
+        WHERE s.puzzle_date = %s
+        GROUP BY s.user_id, name
+    ),
+    ranked AS (
+        SELECT name,
+               total_time,
+               RANK() OVER (ORDER BY total_time ASC) AS rnk
+        FROM totals
+    )
+    SELECT name,
+           total_time,
+           CASE rnk WHEN 1 THEN 3
+                    WHEN 2 THEN 2
+                    WHEN 3 THEN 1
+                    ELSE 0 END AS points
+    FROM ranked
+    ORDER BY rnk
+    """
+    df = pd.read_sql_query(query, conn, params=(puzzle_date,))
+    if not df.empty:
+        df["time"] = df["total_time"].apply(format_time)
+        df = df[["name", "time", "points"]]
+    results["overall"] = df
+
+    return results
+
+
+def get_pips_points_leaderboard(period="weekly"):
+    """
+    Aggregate daily points into weekly, monthly, or all-time leaderboards.
+    Includes easy, medium, hard, and overall points.
+    Returns columns: Name, period, total_points.
+    """
+    conn = get_connection()
+
+    if period == "weekly":
+        group_expr = "DATE_TRUNC('week', puzzle_date)"
+    elif period == "monthly":
+        group_expr = "DATE_TRUNC('month', puzzle_date)"
+    elif period == "all":
+        group_expr = "'all-time'"
+    else:
+        raise ValueError("Invalid period")
+
+    query = f"""
+    -- Per-difficulty points
+    WITH ranked AS (
+        SELECT s.user_id,
+               COALESCE(f.display_name, u.email) AS name,
+               s.puzzle_date,
+               s.difficulty,
+               RANK() OVER (
+                   PARTITION BY s.difficulty, s.puzzle_date
+                   ORDER BY s.time_seconds ASC
+               ) AS rnk
+        FROM pips_scores s
+        JOIN auth.users u ON s.user_id = u.id
+        LEFT JOIN family_members f ON u.id = f.user_id
+    ),
+    diff_points AS (
+        SELECT name,
+               puzzle_date,
+               difficulty,
+               CASE rnk WHEN 1 THEN 3
+                        WHEN 2 THEN 2
+                        WHEN 3 THEN 1
+                        ELSE 0 END AS points
+        FROM ranked
+    ),
+    -- Overall points (sum across difficulties per day)
+    overall AS (
+        SELECT s.user_id,
+               COALESCE(f.display_name, u.email) AS name,
+               s.puzzle_date,
+               SUM(s.time_seconds) AS total_time,
+               RANK() OVER (
+                   PARTITION BY s.puzzle_date
+                   ORDER BY SUM(s.time_seconds) ASC
+               ) AS rnk
+        FROM pips_scores s
+        JOIN auth.users u ON s.user_id = u.id
+        LEFT JOIN family_members f ON u.id = f.user_id
+        GROUP BY s.user_id, name, s.puzzle_date
+    ),
+    overall_points AS (
+        SELECT name,
+               puzzle_date,
+               'overall' AS difficulty,
+               CASE rnk WHEN 1 THEN 3
+                        WHEN 2 THEN 2
+                        WHEN 3 THEN 1
+                        ELSE 0 END AS points
+        FROM overall
+    ),
+    all_points AS (
+        SELECT * FROM diff_points
+        UNION ALL
+        SELECT * FROM overall_points
+    )
+    SELECT name,
+           {group_expr} AS period,
+           SUM(points) AS total_points
+    FROM all_points
+    GROUP BY name, period
+    ORDER BY total_points DESC
+    """
+    return pd.read_sql_query(query, conn)
