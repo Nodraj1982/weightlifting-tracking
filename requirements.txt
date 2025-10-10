@@ -3,4 +3,5 @@ psycopg[binary]==3.2.3
 supabase
 pandas
 streamlit-autorefresh==1.0.1
+streamlit-cookies-manager
 

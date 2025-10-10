@@ -2,6 +2,7 @@ import streamlit as st
 import pathlib
 from supabase import create_client, Client
 import datetime
+from streamlit_cookies_manager import EncryptedCookieManager
 
 # --- Serve static files via query params ---
 query = st.query_params.get("file")
@@ -39,6 +40,11 @@ supabase: Client = create_client(
     st.secrets["SUPABASE_KEY"]
 )
 
+# --- Initialise cookie manager ---
+cookies = EncryptedCookieManager(prefix="supabase", password="a-long-random-secret")
+if not cookies.ready():
+    st.stop()
+
 # --- Ensure session state keys exist ---
 if "session" not in st.session_state:
     st.session_state.session = None
@@ -47,7 +53,7 @@ if "user" not in st.session_state:
 
 # --- Try to restore from cookie ---
 if not st.session_state.session:
-    token = st.experimental_get_cookie("supabase_refresh_token")
+    token = cookies.get("refresh_token")
     if token:
         try:
             refreshed = supabase.auth.refresh_session({"refresh_token": token})
@@ -74,11 +80,8 @@ def refresh_session():
                 st.session_state.session = refreshed.session
                 st.session_state.user = refreshed.user
                 # update cookie with new refresh token
-                st.experimental_set_cookie(
-                    "supabase_refresh_token",
-                    refreshed.session.refresh_token,
-                    expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
-                )
+                cookies["refresh_token"] = refreshed.session.refresh_token
+                cookies.save()
         except Exception as e:
             st.error(f"Session refresh failed: {e}")
 
@@ -100,11 +103,8 @@ if st.session_state.user is None:
                     st.session_state.session = res.session
                     st.session_state.user = res.user
                     # persist refresh token in cookie
-                    st.experimental_set_cookie(
-                        "supabase_refresh_token",
-                        res.session.refresh_token,
-                        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
-                    )
+                    cookies["refresh_token"] = res.session.refresh_token
+                    cookies.save()
                     st.success(f"Logged in as {res.user.email}")
                     st.rerun()
                 else:
@@ -130,7 +130,8 @@ else:
     if st.button("Log out"):
         for key in ["user", "session"]:
             st.session_state[key] = None
-        st.experimental_set_cookie("supabase_refresh_token", "", expires_at=datetime.datetime.utcnow())
+        cookies["refresh_token"] = ""
+        cookies.save()
         st.rerun()
 
 # --- Debug info (optional) ---
