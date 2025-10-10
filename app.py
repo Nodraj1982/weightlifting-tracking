@@ -36,8 +36,8 @@ st.markdown(
     <script>
       const {{ createClient }} = supabase;
       window.supabase = createClient(
-        "{st.secrets['https://snltqtknffxtqhqcqbgg.supabase.co']}",
-        "{st.secrets['SeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNubHRxdGtuZmZ4dHFocWNxYmdnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTAwNTIzOSwiZXhwIjoyMDc0NTgxMjM5fQ.SvRjrL-NygfGb6Tm79Xqelo_Isk8u-tAomY4VrRKEik']}",
+        "{st.secrets['SUPABASE_URL']}",
+        "{st.secrets['SUPABASE_KEY']}",
         {{ auth: {{ persistSession: true, autoRefreshToken: true }} }}
       );
 
