@@ -31,23 +31,32 @@ st.markdown(
 )
 
 # --- Inject Supabase JS client ---
-st.markdown(
-    f"""
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-      const {{ createClient }} = supabase;
-      window.supabase = createClient(
-        "{st.secrets['SUPABASE_URL']}",
-        "{st.secrets['SUPABASE_KEY']}",
-        {{ auth: {{ persistSession: true, autoRefreshToken: true }} }}
-      );
 
-      // Debug: log session changes
-      window.supabase.auth.onAuthStateChange((event, session) => {{
-        console.log("Auth event:", event, session);
-      }});
+st.markdown(
+    """
+    <!-- Load the Supabase JS library -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (typeof supabase !== "undefined") {
+          const { createClient } = supabase;
+          window.supabase = createClient(
+            "%s",
+            "%s",
+            { auth: { persistSession: true, autoRefreshToken: true } }
+          );
+          console.log("Supabase client created:", window.supabase);
+
+          window.supabase.auth.onAuthStateChange((event, session) => {
+            console.log("Auth event:", event, session);
+          });
+        } else {
+          console.error("Supabase library not loaded");
+        }
+      });
     </script>
-    """,
+    """ % (st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"]),
     unsafe_allow_html=True
 )
 
