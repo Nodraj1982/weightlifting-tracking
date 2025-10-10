@@ -1,21 +1,27 @@
 import streamlit as st
+import pathlib
 from supabase import create_client, Client
 from utils import ensure_session_keys, refresh_supabase_session, login_user
 
-# Inject manifest + theme color into the <head>
-st.markdown(
-    """
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#3367D6">
-    """,
-    unsafe_allow_html=True
-)
+# --- Serve static files via query params ---
+query = st.query_params.get("file")
 
+if query == "manifest":
+    st.json(pathlib.Path("manifest.json").read_text())
+    st.stop()
+
+if query == "sw":
+    st.write(pathlib.Path("service-worker.js").read_text())
+    st.stop()
+
+# --- Inject manifest + service worker registration ---
 st.markdown(
     """
+    <link rel="manifest" href="/?file=manifest">
+    <meta name="theme-color" content="#3367D6">
     <script>
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/service-worker.js")
+        navigator.serviceWorker.register("/?file=sw")
           .then(() => console.log("Service Worker registered"))
           .catch(err => console.error("Service Worker registration failed:", err));
       }
@@ -45,7 +51,6 @@ supabase: Client = create_client(
 ensure_session_keys()
 
 # --- Background auto-refresh every 30 minutes ---
-# Requires: pip install streamlit-autorefresh
 try:
     from streamlit_autorefresh import st_autorefresh
     st_autorefresh(interval=1800000, key="session_refresh")  # 30 min = 1,800,000 ms
@@ -93,7 +98,6 @@ else:
         for key in ["user", "user_id", "access_token", "refresh_token"]:
             st.session_state[key] = None
         st.rerun()
-
 
 # --- Debug info (optional) ---
 st.write("Current user_id in session:", st.session_state.get("user_id"))
