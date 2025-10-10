@@ -56,14 +56,18 @@ st.markdown(
     f"""
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-      const {{ createClient }} = supabase;
-      const client = createClient(
-        "{st.secrets['SUPABASE_URL']}",
-        "{st.secrets['SUPABASE_KEY']}"
-      );
+      window.addEventListener("load", () => {{
+        const {{ createClient }} = supabase;
+        window.supabase = createClient(
+          "{st.secrets['SUPABASE_URL']}",
+          "{st.secrets['SUPABASE_KEY']}",
+          {{ auth: {{ persistSession: true, autoRefreshToken: true }} }}
+        );
+        console.log("Supabase client created:", window.supabase);
 
-      client.from("profiles").select("*").limit(1).then(res => {{
-        console.log("Test query result:", res);
+        window.supabase.auth.onAuthStateChange((event, session) => {{
+          console.log("Auth event:", event, session);
+        }});
       }});
     </script>
     """,
