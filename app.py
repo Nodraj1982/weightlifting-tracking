@@ -2,6 +2,28 @@ import streamlit as st
 from supabase import create_client, Client
 from utils import ensure_session_keys, refresh_supabase_session, login_user
 
+# Inject manifest + theme color into the <head>
+st.markdown(
+    """
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#3367D6">
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/service-worker.js")
+          .then(() => console.log("Service Worker registered"))
+          .catch(err => console.error("Service Worker registration failed:", err));
+      }
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- Page config ---
 st.set_page_config(page_title="Weightlifting Tracker", page_icon="🏋️")
 
