@@ -30,6 +30,34 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    f"""
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+      const {{ createClient }} = supabase;
+      window.supabase = createClient(
+        "{st.secrets['https://snltqtknffxtqhqcqbgg.supabase.co']}",
+        "{st.secrets['SeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNubHRxdGtuZmZ4dHFocWNxYmdnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTAwNTIzOSwiZXhwIjoyMDc0NTgxMjM5fQ.SvRjrL-NygfGb6Tm79Xqelo_Isk8u-tAomY4VrRKEik']}",
+        {{ auth: {{ persistSession: true, autoRefreshToken: true }} }}
+      );
+
+      // Debug: log session changes
+      window.supabase.auth.onAuthStateChange((event, session) => {{
+        console.log("Auth event:", event, session);
+      }});
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
+if query == "icon192":
+    st.image("icon-192.png")
+    st.stop()
+
+if query == "icon512":
+    st.image("icon-512.png")
+    st.stop()
+
 # --- Page config ---
 st.set_page_config(page_title="Weightlifting Tracker", page_icon="🏋️")
 
