@@ -30,6 +30,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# --- Inject Supabase JS client ---
 st.markdown(
     f"""
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -50,6 +51,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# --- Simple login form wired to JS client ---
 st.markdown(
     """
     <input id="email" type="email" placeholder="Email">
@@ -71,6 +73,8 @@ st.markdown(
           console.log("Session:", data.session);
         }
       }
+      // Expose globally so the button can call it
+      window.login = login;
     </script>
     """,
     unsafe_allow_html=True
