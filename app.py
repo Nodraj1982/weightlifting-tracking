@@ -46,20 +46,20 @@ if not cookies.ready():
     st.stop()
 
 # --- Ensure session state keys exist ---
-if "session" not in st.session_state:
-    st.session_state.session = None
-if "user" not in st.session_state:
-    st.session_state.user = None
+for key in ["access_token", "refresh_token", "user_email"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
 # --- Try to restore from cookie ---
-if not st.session_state.session:
+if not st.session_state["refresh_token"]:
     token = cookies.get("refresh_token")
     if token:
         try:
             refreshed = supabase.auth.refresh_session({"refresh_token": token})
             if refreshed.session:
-                st.session_state.session = refreshed.session
-                st.session_state.user = refreshed.user
+                st.session_state["access_token"] = refreshed.session.access_token
+                st.session_state["refresh_token"] = refreshed.session.refresh_token
+                st.session_state["user_email"] = refreshed.user.email
                 st.write("Session restored from cookie")
         except Exception as e:
             st.error(f"Failed to restore session: {e}")
@@ -73,22 +73,24 @@ except ImportError:
 
 # --- Refresh session if needed ---
 def refresh_session():
-    if st.session_state.get("refresh_token"):
+    if st.session_state["refresh_token"]:
         try:
             refreshed = supabase.auth.refresh_session(
-                {"refresh_token": st.session_state.refresh_token}
+                {"refresh_token": st.session_state["refresh_token"]}
             )
             if refreshed.session:
-                st.session_state.access_token = refreshed.session.access_token
-                st.session_state.refresh_token = refreshed.session.refresh_token
-                st.session_state.user = refreshed.user
+                st.session_state["access_token"] = refreshed.session.access_token
+                st.session_state["refresh_token"] = refreshed.session.refresh_token
+                st.session_state["user_email"] = refreshed.user.email
                 cookies["refresh_token"] = refreshed.session.refresh_token
                 cookies.save()
         except Exception as e:
             st.error(f"Session refresh failed: {e}")
 
+refresh_session()
+
 # --- Authentication logic ---
-if st.session_state.user is None:
+if not st.session_state["user_email"]:
     st.header("Login / Sign Up")
 
     tab_login, tab_signup = st.tabs(["🔑 Log In", "🆕 Sign Up"])
@@ -100,9 +102,9 @@ if st.session_state.user is None:
             try:
                 res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 if res.user:
-                    st.session_state.session = res.session
-                    st.session_state.user = res.user
-                    # persist refresh token in cookie
+                    st.session_state["access_token"] = res.session.access_token
+                    st.session_state["refresh_token"] = res.session.refresh_token
+                    st.session_state["user_email"] = res.user.email
                     cookies["refresh_token"] = res.session.refresh_token
                     cookies.save()
                     st.success(f"Logged in as {res.user.email}")
@@ -126,14 +128,14 @@ if st.session_state.user is None:
                 st.error(f"Sign-up failed: {e}")
 
 else:
-    st.success(f"Welcome {st.session_state.user.email}")
+    st.success(f"Welcome {st.session_state['user_email']}")
     if st.button("Log out"):
-        for key in ["user", "session"]:
+        for key in ["access_token", "refresh_token", "user_email"]:
             st.session_state[key] = None
         cookies["refresh_token"] = ""
         cookies.save()
         st.rerun()
 
 # --- Debug info (optional) ---
-st.write("Current user in session:", st.session_state.get("user"))
+st.write("Current user email:", st.session_state.get("user_email"))
 st.caption("Use the sidebar to navigate between pages.")
