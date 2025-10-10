@@ -53,34 +53,23 @@ st.markdown(
 
 # --- Simple login form wired to JS client ---
 st.markdown(
-    """
-    <input id="email" type="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button id="loginBtn">Login</button>
-
+    f"""
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-      async function login() {
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
-        const { data, error } = await window.supabase.auth.signInWithPassword({
-          email: email,
-          password: password
-        });
-        if (error) {
-          alert("Login failed: " + error.message);
-        } else {
-          alert("Logged in!");
-          console.log("Session:", data.session);
-        }
-      }
-      // Attach event listener instead of inline onclick
-      document.addEventListener("DOMContentLoaded", () => {
-        document.getElementById("loginBtn").addEventListener("click", login);
-      });
+      const {{ createClient }} = supabase;
+      const client = createClient(
+        "{st.secrets['SUPABASE_URL']}",
+        "{st.secrets['SUPABASE_KEY']}"
+      );
+
+      client.from("profiles").select("*").limit(1).then(res => {{
+        console.log("Test query result:", res);
+      }});
     </script>
     """,
     unsafe_allow_html=True
 )
+
 if query == "icon192":
     st.image("icon-192.png")
     st.stop()
