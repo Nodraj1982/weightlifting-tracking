@@ -56,7 +56,7 @@ st.markdown(
     """
     <input id="email" type="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
+    <button id="loginBtn">Login</button>
 
     <script>
       async function login() {
@@ -73,13 +73,14 @@ st.markdown(
           console.log("Session:", data.session);
         }
       }
-      // Expose globally so the button can call it
-      window.login = login;
+      // Attach event listener instead of inline onclick
+      document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("loginBtn").addEventListener("click", login);
+      });
     </script>
     """,
     unsafe_allow_html=True
 )
-
 if query == "icon192":
     st.image("icon-192.png")
     st.stop()
