@@ -1,7 +1,7 @@
 import streamlit as st
 import pathlib
 from supabase import create_client, Client
-from utils import ensure_session_keys, refresh_supabase_session, login_user
+import datetime
 
 # --- Serve static files via query params ---
 query = st.query_params.get("file")
@@ -13,75 +13,6 @@ if query == "manifest":
 if query == "sw":
     st.write(pathlib.Path("service-worker.js").read_text())
     st.stop()
-
-# --- Inject manifest + service worker registration ---
-st.markdown(
-    """
-    <link rel="manifest" href="/?file=manifest">
-    <meta name="theme-color" content="#3367D6">
-    <script>
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/?file=sw")
-          .then(() => console.log("Service Worker registered"))
-          .catch(err => console.error("Service Worker registration failed:", err));
-      }
-    </script>
-    """,
-    unsafe_allow_html=True
-)
-
-# --- Inject Supabase JS client ---
-
-st.markdown(
-    """
-    <!-- Load the Supabase JS library -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
-
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        if (typeof supabase !== "undefined") {
-          const { createClient } = supabase;
-          window.supabase = createClient(
-            "%s",
-            "%s",
-            { auth: { persistSession: true, autoRefreshToken: true } }
-          );
-          console.log("Supabase client created:", window.supabase);
-
-          window.supabase.auth.onAuthStateChange((event, session) => {
-            console.log("Auth event:", event, session);
-          });
-        } else {
-          console.error("Supabase library not loaded");
-        }
-      });
-    </script>
-    """ % (st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"]),
-    unsafe_allow_html=True
-)
-
-# --- Simple login form wired to JS client ---
-st.markdown(
-    f"""
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-      window.addEventListener("load", () => {{
-        const {{ createClient }} = supabase;
-        window.supabase = createClient(
-          "{st.secrets['SUPABASE_URL']}",
-          "{st.secrets['SUPABASE_KEY']}",
-          {{ auth: {{ persistSession: true, autoRefreshToken: true }} }}
-        );
-        console.log("Supabase client created:", window.supabase);
-
-        window.supabase.auth.onAuthStateChange((event, session) => {{
-          console.log("Auth event:", event, session);
-        }});
-      }});
-    </script>
-    """,
-    unsafe_allow_html=True
-)
 
 if query == "icon192":
     st.image("icon-192.png")
@@ -108,18 +39,50 @@ supabase: Client = create_client(
     st.secrets["SUPABASE_KEY"]
 )
 
-# --- Ensure session keys exist ---
-ensure_session_keys()
+# --- Ensure session state keys exist ---
+if "session" not in st.session_state:
+    st.session_state.session = None
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+# --- Try to restore from cookie ---
+if not st.session_state.session:
+    token = st.experimental_get_cookie("supabase_refresh_token")
+    if token:
+        try:
+            refreshed = supabase.auth.refresh_session({"refresh_token": token})
+            if refreshed.session:
+                st.session_state.session = refreshed.session
+                st.session_state.user = refreshed.user
+                st.write("Session restored from cookie")
+        except Exception as e:
+            st.error(f"Failed to restore session: {e}")
 
 # --- Background auto-refresh every 30 minutes ---
 try:
     from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=1800000, key="session_refresh")  # 30 min = 1,800,000 ms
+    st_autorefresh(interval=1800000, key="session_refresh")  # 30 min
 except ImportError:
     st.warning("streamlit-autorefresh not installed. Background refresh disabled.")
 
 # --- Refresh session if needed ---
-refresh_supabase_session()
+def refresh_session():
+    if st.session_state.session:
+        try:
+            refreshed = supabase.auth.refresh_session(st.session_state.session)
+            if refreshed.session:
+                st.session_state.session = refreshed.session
+                st.session_state.user = refreshed.user
+                # update cookie with new refresh token
+                st.experimental_set_cookie(
+                    "supabase_refresh_token",
+                    refreshed.session.refresh_token,
+                    expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
+                )
+        except Exception as e:
+            st.error(f"Session refresh failed: {e}")
+
+refresh_session()
 
 # --- Authentication logic ---
 if st.session_state.user is None:
@@ -132,8 +95,17 @@ if st.session_state.user is None:
         password = st.text_input("Password", type="password", key="login_password")
         if st.button("Log in"):
             try:
-                if login_user(email, password):
-                    st.success(f"Logged in as {st.session_state.user['email']}")
+                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if res.user:
+                    st.session_state.session = res.session
+                    st.session_state.user = res.user
+                    # persist refresh token in cookie
+                    st.experimental_set_cookie(
+                        "supabase_refresh_token",
+                        res.session.refresh_token,
+                        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
+                    )
+                    st.success(f"Logged in as {res.user.email}")
                     st.rerun()
                 else:
                     st.error("Invalid login credentials.")
@@ -154,13 +126,13 @@ if st.session_state.user is None:
                 st.error(f"Sign-up failed: {e}")
 
 else:
-    st.success(f"Welcome {st.session_state.user['email']}")
+    st.success(f"Welcome {st.session_state.user.email}")
     if st.button("Log out"):
-        for key in ["user", "user_id", "access_token", "refresh_token"]:
+        for key in ["user", "session"]:
             st.session_state[key] = None
+        st.experimental_set_cookie("supabase_refresh_token", "", expires_at=datetime.datetime.utcnow())
         st.rerun()
 
 # --- Debug info (optional) ---
-st.write("Current user_id in session:", st.session_state.get("user_id"))
-
+st.write("Current user in session:", st.session_state.get("user"))
 st.caption("Use the sidebar to navigate between pages.")
