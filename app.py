@@ -73,19 +73,19 @@ except ImportError:
 
 # --- Refresh session if needed ---
 def refresh_session():
-    if st.session_state.session:
+    if st.session_state.get("refresh_token"):
         try:
-            refreshed = supabase.auth.refresh_session(st.session_state.session)
+            refreshed = supabase.auth.refresh_session(
+                {"refresh_token": st.session_state.refresh_token}
+            )
             if refreshed.session:
-                st.session_state.session = refreshed.session
+                st.session_state.access_token = refreshed.session.access_token
+                st.session_state.refresh_token = refreshed.session.refresh_token
                 st.session_state.user = refreshed.user
-                # update cookie with new refresh token
                 cookies["refresh_token"] = refreshed.session.refresh_token
                 cookies.save()
         except Exception as e:
             st.error(f"Session refresh failed: {e}")
-
-refresh_session()
 
 # --- Authentication logic ---
 if st.session_state.user is None:
