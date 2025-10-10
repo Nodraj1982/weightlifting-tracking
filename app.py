@@ -50,6 +50,32 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    """
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <script>
+      async function login() {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        const { data, error } = await window.supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+        if (error) {
+          alert("Login failed: " + error.message);
+        } else {
+          alert("Logged in!");
+          console.log("Session:", data.session);
+        }
+      }
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
 if query == "icon192":
     st.image("icon-192.png")
     st.stop()
