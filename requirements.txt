@@ -2,3 +2,5 @@ streamlit
 supabase
 streamlit-cookies-manager
 streamlit-autorefresh
+psycopg[binary]
+pandas
