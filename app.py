@@ -46,7 +46,7 @@ if not cookies.ready():
     st.stop()
 
 # --- Ensure session state keys exist ---
-for key in ["access_token", "refresh_token", "user_email"]:
+for key in ["access_token", "refresh_token", "user_email", "user_id"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
@@ -55,11 +55,12 @@ if not st.session_state["refresh_token"]:
     token = cookies.get("refresh_token")
     if token:
         try:
-            refreshed = supabase.auth.refresh_session(token)  # ✅ FIXED: pass string, not dict
+            refreshed = supabase.auth.refresh_session(token)  # pass string, not dict
             if refreshed.session:
                 st.session_state["access_token"] = refreshed.session.access_token
                 st.session_state["refresh_token"] = refreshed.session.refresh_token
                 st.session_state["user_email"] = refreshed.user.email
+                st.session_state["user_id"] = refreshed.user.id   # ✅ added
                 st.write("Session restored from cookie")
         except Exception as e:
             st.error(f"Failed to restore session: {e}")
@@ -75,11 +76,12 @@ except ImportError:
 def refresh_session():
     if st.session_state["refresh_token"]:
         try:
-            refreshed = supabase.auth.refresh_session(st.session_state["refresh_token"])  # ✅ FIXED
+            refreshed = supabase.auth.refresh_session(st.session_state["refresh_token"])
             if refreshed.session:
                 st.session_state["access_token"] = refreshed.session.access_token
                 st.session_state["refresh_token"] = refreshed.session.refresh_token
                 st.session_state["user_email"] = refreshed.user.email
+                st.session_state["user_id"] = refreshed.user.id   # ✅ added
                 cookies["refresh_token"] = refreshed.session.refresh_token
                 cookies.save()
         except Exception as e:
@@ -103,6 +105,7 @@ if not st.session_state["user_email"]:
                     st.session_state["access_token"] = res.session.access_token
                     st.session_state["refresh_token"] = res.session.refresh_token
                     st.session_state["user_email"] = res.user.email
+                    st.session_state["user_id"] = res.user.id   # ✅ added
                     cookies["refresh_token"] = res.session.refresh_token
                     cookies.save()
                     st.success(f"Logged in as {res.user.email}")
@@ -128,7 +131,7 @@ if not st.session_state["user_email"]:
 else:
     st.success(f"Welcome {st.session_state['user_email']}")
     if st.button("Log out"):
-        for key in ["access_token", "refresh_token", "user_email"]:
+        for key in ["access_token", "refresh_token", "user_email", "user_id"]:
             st.session_state[key] = None
         cookies["refresh_token"] = ""
         cookies.save()
@@ -137,5 +140,6 @@ else:
 # --- Debug info (optional) ---
 if st.session_state.get("user_email") == "jordan.kennedy.leeds@googlemail.com":
     st.write("Current user email:", st.session_state.get("user_email"))
+    st.write("Current user id:", st.session_state.get("user_id"))
 
 st.caption("Use the sidebar to navigate between pages.")
