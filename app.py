@@ -55,7 +55,7 @@ if not st.session_state["refresh_token"]:
     token = cookies.get("refresh_token")
     if token:
         try:
-            refreshed = supabase.auth.refresh_session({"refresh_token": token})
+            refreshed = supabase.auth.refresh_session(token)  # ✅ FIXED: pass string, not dict
             if refreshed.session:
                 st.session_state["access_token"] = refreshed.session.access_token
                 st.session_state["refresh_token"] = refreshed.session.refresh_token
@@ -75,9 +75,7 @@ except ImportError:
 def refresh_session():
     if st.session_state["refresh_token"]:
         try:
-            refreshed = supabase.auth.refresh_session(
-                {"refresh_token": st.session_state["refresh_token"]}
-            )
+            refreshed = supabase.auth.refresh_session(st.session_state["refresh_token"])  # ✅ FIXED
             if refreshed.session:
                 st.session_state["access_token"] = refreshed.session.access_token
                 st.session_state["refresh_token"] = refreshed.session.refresh_token
@@ -137,5 +135,7 @@ else:
         st.rerun()
 
 # --- Debug info (optional) ---
-st.write("Current user email:", st.session_state.get("user_email"))
+if st.session_state.get("user_email") == "jordan.kennedy.leeds@googlemail.com":
+    st.write("Current user email:", st.session_state.get("user_email"))
+
 st.caption("Use the sidebar to navigate between pages.")
