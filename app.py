@@ -24,13 +24,13 @@ if query == "icon512":
     st.stop()
 
 # --- Page config ---
-st.set_page_config(page_title="Weightlifting Tracker", page_icon="🏋️")
-
-st.title("🏋️ Weightlifting Tracker")
+st.set_page_config(page_title="Jellybean: One Sweet Place", page_icon="🍬")
+st.title("🍬 Jellybean")
+st.caption("One Sweet Place")
 
 # --- Update notes for testers ---
 st.success("""
-Update to scheme control. Now Has 3 x 15, 3 x 10, 3 x 5 only. Suggestion logic updated accordingly.
+Rebrand of app and tidy up of UI to take into account new features.
 For any further feedback, please reach out at: **Jordan.kennedy.leeds@googlemail.com**
 """)
 
